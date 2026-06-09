@@ -1,0 +1,50 @@
+{
+  "59727551": {
+    "hostawayReservationId": "59727551",
+    "hostawayListingId": 227443,
+    "guestName": "Suzanne Brink",
+    "guestLabel": "Brink — booking.com — Jun 8",
+    "platform": "booking.com",
+    "checkIn": "2026-06-09",
+    "checkOut": "2026-06-11",
+    "locks": [
+      {
+        "lockId": 12407212,
+        "role": "unit",
+        "address": "14 Kenneth Rd",
+        "code": "823840",
+        "pwdId": 83294986,
+        "strategy": "timed",
+        "fallback": false,
+        "fallbackReason": null
+      }
+    ],
+    "reservationId": "59727551",
+    "createdAt": "2026-06-09T19:11:59.643Z",
+    "status": "active"
+  },
+  "60695021": {
+    "hostawayReservationId": "60695021",
+    "hostawayListingId": 184041,
+    "guestName": "Chris Van PFunk",
+    "guestLabel": "Van PFunk — airbnb — Jun 8",
+    "platform": "airbnb",
+    "checkIn": "2026-06-09",
+    "checkOut": "2026-06-10",
+    "locks": [
+      {
+        "lockId": 9839654,
+        "role": "unit",
+        "address": "37 Smith St U4",
+        "code": "77410591",
+        "pwdId": 83294984,
+        "strategy": "offline",
+        "fallback": false,
+        "fallbackReason": null
+      }
+    ],
+    "reservationId": "60695021",
+    "createdAt": "2026-06-09T19:11:58.980Z",
+    "status": "active"
+  }
+}
