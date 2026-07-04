@@ -61,10 +61,10 @@ export async function createCodesForBooking(booking) {
   const record = { hostawayReservationId, hostawayListingId, guestName: `${guestFirstName} ${guestLastName}`, guestLabel, platform: platformKey, checkIn, checkOut, locks: lockResults };
 
   if (hasAnyFailure) {
-    markFailed(hostawayReservationId, new Error("One or more locks failed"));
+    await markFailed(hostawayReservationId, new Error("One or more locks failed"));
     Object.assign(record, { status: "partial" });
   } else {
-    saveRecord(hostawayReservationId, record);
+    await saveRecord(hostawayReservationId, record);
   }
 
   const propertyName = allLocks[0]?.address ?? `Listing ${hostawayListingId}`;
@@ -90,7 +90,7 @@ export async function createCodesForBooking(booking) {
 }
 
 export async function deleteCodesForBooking(hostawayReservationId) {
-  const record = getRecord(hostawayReservationId);
+  const record = await getRecord(hostawayReservationId);
   if (!record) { console.log(`[orchestrator] No record for ${hostawayReservationId}`); return { skipped: true }; }
   const token   = await getToken();
   const results = [];
@@ -104,7 +104,7 @@ export async function deleteCodesForBooking(hostawayReservationId) {
       results.push({ lockId: lock.lockId, deleted: false, error: err.message });
     }
   }
-  markDeleted(hostawayReservationId);
+  await markDeleted(hostawayReservationId);
   return { success: true, results };
 }
 
