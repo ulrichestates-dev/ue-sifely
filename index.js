@@ -7,27 +7,27 @@ import { startScheduler, runDailyJob }                  from "./scheduler.js";
 import { createCodesForBooking, deleteCodesForBooking, refreshCodesForBooking } from "./orchestrator.js";
 import { getRecord, getAllRecords }                      from "./records.js";
 import { createMcpServer }                               from "./mcp-server.js";
-import { SSEServerTransport }                             from "@modelcontextprotocol/sdk/server/sse.js";
+import { StreamableHTTPServerTransport }                  from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
-const mcpServer = createMcpServer();
-const mcpTransports = new Map();
-
-app.get("/mcp/sse", async (req, res) => {
-  const transport = new SSEServerTransport("/mcp/messages", res);
-  mcpTransports.set(transport.sessionId, transport);
-  res.on("close", () => mcpTransports.delete(transport.sessionId));
-  await mcpServer.connect(transport);
+app.post("/mcp", async (req, res) => {
+  const server = createMcpServer();
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  await server.connect(transport);
+  await transport.handleRequest(req, res, req.body);
 });
 
-app.post("/mcp/messages", async (req, res) => {
-  const transport = mcpTransports.get(req.query.sessionId);
-  if (!transport) return res.status(400).json({ error: "No active MCP session" });
-  await transport.handlePostMessage(req, res, req.body);
+app.get("/mcp", async (req, res) => {
+  const server = createMcpServer();
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  await server.connect(transport);
+  await transport.handleRequest(req, res);
 });
+
+app.delete("/mcp", (req, res) => res.status(200).end());
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok", service: "ue-sifely", version: "2.0.0", timestamp: new Date().toISOString() });
