@@ -4,6 +4,27 @@ function generateSixDigitCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+// End every guest code at 5:00 PM Eastern on the checkout calendar day.
+// Hostaway checkOut is usually a bare date (YYYY-MM-DD) which parses to UTC
+// midnight, so we anchor on the calendar day and build 17:00 ET explicitly,
+// resolving the correct UTC offset (EST -05:00 / EDT -04:00) for that date.
+function checkoutDeadlineMs(checkOut) {
+  const d = new Date(checkOut);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  // Find America/New_York offset on this date via Intl (handles DST).
+  const probe = new Date(`${y}-${m}-${day}T17:00:00Z`);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", timeZoneName: "shortOffset",
+  }).formatToParts(probe).find(p => p.type === "timeZoneName")?.value || "GMT-5";
+  const match = parts.match(/GMT([+-]\d{1,2})/);
+  const offsetHrs = match ? parseInt(match[1], 10) : -5;
+  const sign = offsetHrs < 0 ? "-" : "+";
+  const abs = String(Math.abs(offsetHrs)).padStart(2, "0");
+  return new Date(`${y}-${m}-${day}T17:00:00${sign}${abs}:00`).getTime();
+}
+
 export async function generatePasscode(token, { lockId, hasGateway, guestLabel, checkIn, checkOut }) {
   if (hasGateway) {
     try {
@@ -34,7 +55,7 @@ export async function deletePasscode(token, { lockId, pwdId }) {
 
 async function createTimedCode(token, { lockId, guestLabel, checkIn, checkOut }) {
   const startDate    = new Date(checkIn).getTime();
-  const endDate      = new Date(checkOut).getTime() + 2 * 60 * 60 * 1000;
+  const endDate      = checkoutDeadlineMs(checkOut);
   const keyboardPwd  = generateSixDigitCode();
   const params = new URLSearchParams({
     lockId: String(lockId), keyboardPwdType: "3", keyboardPwdName: guestLabel,
@@ -53,7 +74,7 @@ async function createTimedCode(token, { lockId, guestLabel, checkIn, checkOut })
 
 async function createOfflineCode(token, { lockId, guestLabel, checkIn, checkOut }) {
   const startDate = new Date(checkIn).getTime();
-  const endDate   = new Date(checkOut).getTime() + 2 * 60 * 60 * 1000;
+  const endDate   = checkoutDeadlineMs(checkOut);
   const params = new URLSearchParams({
     lockId: String(lockId), keyboardPwdType: "2", keyboardPwdName: guestLabel,
     startDate: String(startDate), endDate: String(endDate),
