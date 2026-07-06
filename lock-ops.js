@@ -2,12 +2,13 @@
  * lock-ops.js — Direct per-lock Sifely v3 operations.
  *
  * These operate on a lockId directly, independent of any Hostaway reservation.
- * Confirmed endpoints (from passcodes.js): /v3/keyboardPwd/{add,get,delete}
- * Inferred from the TTLock/Sciener v3 platform Sifely white-labels:
- *   /v3/keyboardPwd/list, /v3/keyboardPwd/change, /v3/lockRecord/list,
- *   /v3/lock/detail, /v3/lock/queryOpenState, /v3/lock/unlock, /v3/lock/lock
- * All calls return the raw parsed Sifely response so wrong paths surface as
- * data (code/errcode/description) instead of throwing.
+ * Confirmed WRITE endpoints (from passcodes.js): /v3/keyboardPwd/{add,delete}
+ * Verified via live calls (2026-07-06):
+ *   READS use GET, not POST: /v3/lock/detail, /v3/lock/queryOpenState,
+ *   /v3/lockRecord/list all reject POST ("method not supported").
+ *   Passcode list lives at /v3/lock/listKeyboardPwd (not /v3/keyboardPwd/list,
+ *   which 404s).
+ * Reads return the raw parsed Sifely response so path issues surface as data.
  */
 
 const BASE_URL = process.env.SIFELY_BASE_URL || "https://app-smart-server.sifely.com";
@@ -26,16 +27,17 @@ function sixDigit() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-async function post(token, path, params, { form = false } = {}) {
+async function req(token, method, path, params, { form = false } = {}) {
   const qs = new URLSearchParams(params);
-  const url = form ? `${BASE_URL}${path}` : `${BASE_URL}${path}?${qs}`;
+  const isGet = method === "GET";
+  const url = (isGet || !form) ? `${BASE_URL}${path}?${qs}` : `${BASE_URL}${path}`;
   const res = await fetch(url, {
-    method: "POST",
+    method,
     headers: {
       Authorization: `Bearer ${token}`,
-      ...(form ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
+      ...(form && !isGet ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
     },
-    ...(form ? { body: qs } : {}),
+    ...(form && !isGet ? { body: qs } : {}),
   });
   const raw = await res.text();
   let data;
@@ -44,10 +46,13 @@ async function post(token, path, params, { form = false } = {}) {
   return data;
 }
 
-// ---- READ ----
+const get  = (token, path, params) => req(token, "GET", path, params);
+const post = (token, path, params, opts) => req(token, "POST", path, params, opts);
+
+// ---- READ (GET) ----
 
 export async function listLockCodes(token, { lockId, pageNo = 1, pageSize = 100 }) {
-  return post(token, "/v3/keyboardPwd/list", {
+  return get(token, "/v3/lock/listKeyboardPwd", {
     lockId: String(lockId),
     pageNo: String(pageNo),
     pageSize: String(pageSize),
@@ -56,7 +61,7 @@ export async function listLockCodes(token, { lockId, pageNo = 1, pageSize = 100 
 }
 
 export async function lockRecords(token, { lockId, pageNo = 1, pageSize = 50 }) {
-  return post(token, "/v3/lockRecord/list", {
+  return get(token, "/v3/lockRecord/list", {
     lockId: String(lockId),
     pageNo: String(pageNo),
     pageSize: String(pageSize),
@@ -64,14 +69,14 @@ export async function lockRecords(token, { lockId, pageNo = 1, pageSize = 50 }) 
 }
 
 export async function lockDetail(token, { lockId }) {
-  return post(token, "/v3/lock/detail", { lockId: String(lockId) });
+  return get(token, "/v3/lock/detail", { lockId: String(lockId) });
 }
 
 export async function queryLockState(token, { lockId }) {
-  return post(token, "/v3/lock/queryOpenState", { lockId: String(lockId) });
+  return get(token, "/v3/lock/queryOpenState", { lockId: String(lockId) });
 }
 
-// ---- WRITE: codes ----
+// ---- WRITE: codes (POST) ----
 
 export async function addLockCode(token, { lockId, code, name, startDate, endDate }) {
   const keyboardPwd = code || sixDigit();
@@ -109,7 +114,7 @@ export async function changeLockCode(token, { lockId, keyboardPwdId, newCode, st
   return post(token, "/v3/keyboardPwd/change", params);
 }
 
-// ---- WRITE: gateway remote ops (gateway locks only) ----
+// ---- WRITE: gateway remote ops (gateway locks only, POST) ----
 
 export async function remoteUnlock(token, { lockId }) {
   return post(token, "/v3/lock/unlock", { lockId: String(lockId) });
