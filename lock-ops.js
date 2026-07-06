@@ -1,13 +1,14 @@
 /**
  * lock-ops.js — Direct per-lock Sifely v3 operations.
  *
- * These operate on a lockId directly, independent of any Hostaway reservation.
- * Confirmed WRITE endpoints (from passcodes.js): /v3/keyboardPwd/{add,delete}
- * Verified via live calls (2026-07-06):
- *   READS use GET, not POST: /v3/lock/detail, /v3/lock/queryOpenState,
- *   /v3/lockRecord/list all reject POST ("method not supported").
- *   Passcode list lives at /v3/lock/listKeyboardPwd (not /v3/keyboardPwd/list,
- *   which 404s).
+ * Operate on a lockId directly, independent of any Hostaway reservation.
+ * Verified against live Sifely API (2026-07-06):
+ *   READS use GET: /v3/lock/detail, /v3/lock/queryOpenState, /v3/lockRecord/list,
+ *     /v3/lock/listKeyboardPwd  (POST returns "method not supported"; the old
+ *     /v3/keyboardPwd/list path 404s).
+ *   WRITES use POST. Offline timed code = keyboardPwdType 2 (NOT 3). addType 2
+ *     (auto-generate) is broken server-side, so we self-supply the code with
+ *     addType 1. Timestamps must be real Unix ms (0/blank = "Invalid Parameter").
  * Reads return the raw parsed Sifely response so path issues surface as data.
  */
 
@@ -79,18 +80,20 @@ export async function queryLockState(token, { lockId }) {
 // ---- WRITE: codes (POST) ----
 
 export async function addLockCode(token, { lockId, code, name, startDate, endDate }) {
+  const s = toMs(startDate), e = toMs(endDate);
+  if (!s || !e) throw new Error("startDate and endDate are required (real dates; 0/blank is rejected by Sifely)");
   const keyboardPwd = code || sixDigit();
   const params = {
     lockId: String(lockId),
-    keyboardPwdType: "3",              // 3 = period (start/end)
+    keyboardPwdType: "2",              // 2 = offline timed
     keyboardPwd,
     keyboardPwdName: name || `Manual — ${new Date().toISOString().slice(0, 10)}`,
-    addType: "2",                      // 2 = via gateway/cloud where available
+    addType: "1",                      // 1 = self-supplied code (auto-gen is broken)
+    startDate: s,
+    endDate: e,
   };
-  const s = toMs(startDate), e = toMs(endDate);
-  if (s) params.startDate = s;
-  if (e) params.endDate = e;
   const data = await post(token, "/v3/keyboardPwd/add", params);
+  // Sifely echoes null for the code on custom entries, so return what we sent.
   return { requestedCode: keyboardPwd, response: data };
 }
 
@@ -105,7 +108,7 @@ export async function changeLockCode(token, { lockId, keyboardPwdId, newCode, st
   const params = {
     lockId: String(lockId),
     keyboardPwdId: String(keyboardPwdId),
-    changeType: "2",                   // 2 = via gateway/cloud
+    changeType: "2",
   };
   if (newCode) params.newKeyboardPwd = String(newCode);
   const s = toMs(startDate), e = toMs(endDate);
