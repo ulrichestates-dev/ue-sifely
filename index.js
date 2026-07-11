@@ -2,6 +2,7 @@ import "dotenv/config";
 import express                                           from "express";
 import { getToken }                                      from "./auth.js";
 import { getAllLocks }                                   from "./locks.js";
+import { listLockCodes, deleteLockCode }                 from "./lock-ops.js";
 import { webhookRouter }                                 from "./webhook.js";
 import { startScheduler, runDailyJob }                  from "./scheduler.js";
 import { createCodesForBooking, deleteCodesForBooking, refreshCodesForBooking } from "./orchestrator.js";
@@ -12,6 +13,15 @@ import { StreamableHTTPServerTransport }                  from "@modelcontextpro
 const app  = express();
 const PORT = process.env.PORT || 3000;
 app.use(express.json());
+
+// Shared-secret guard for the code read/delete routes that ue-codes calls.
+// Closed with 503 until UE_SIFELY_KEY is set, so it's never accidentally open.
+function requireUeKey(req, res, next) {
+  const expected = process.env.UE_SIFELY_KEY;
+  if (!expected) return res.status(503).json({ error: "UE_SIFELY_KEY not configured" });
+  if (req.get("x-ue-key") !== expected) return res.status(401).json({ error: "unauthorized" });
+  next();
+}
 
 app.post("/mcp", async (req, res) => {
   const server = createMcpServer();
@@ -41,6 +51,32 @@ app.post("/auth/token", async (req, res) => {
 app.get("/locks", async (req, res) => {
   try { const token = await getToken(); const locks = await getAllLocks(token); res.json({ success: true, count: locks.length, locks }); }
   catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// --- Guarded routes for ue-codes (live code read + single-code delete) ---
+
+// List the live keyboard passcodes on a lock.
+app.get("/lock/:lockId/codes", requireUeKey, async (req, res) => {
+  try {
+    const token = await getToken();
+    const data = await listLockCodes(token, {
+      lockId: Number(req.params.lockId),
+      pageNo: Number(req.query.pageNo) || 1,
+      pageSize: Number(req.query.pageSize) || 100,
+    });
+    res.json({ success: true, ...data });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// Delete one keyboard passcode by id.
+app.post("/lock/code/delete", requireUeKey, async (req, res) => {
+  try {
+    const { lockId, keyboardPwdId } = req.body || {};
+    if (!lockId || !keyboardPwdId) return res.status(400).json({ error: "lockId and keyboardPwdId are required" });
+    const token = await getToken();
+    const result = await deleteLockCode(token, { lockId: Number(lockId), keyboardPwdId: Number(keyboardPwdId) });
+    res.json({ success: true, result });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
 app.post("/passcode/create", async (req, res) => {
