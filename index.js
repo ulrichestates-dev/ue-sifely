@@ -2,7 +2,7 @@ import "dotenv/config";
 import express                                           from "express";
 import { getToken }                                      from "./auth.js";
 import { getAllLocks }                                   from "./locks.js";
-import { listLockCodes, deleteLockCode }                 from "./lock-ops.js";
+import { listLockCodes, deleteLockCode, addLockCode }    from "./lock-ops.js";
 import { webhookRouter }                                 from "./webhook.js";
 import { startScheduler, runDailyJob }                  from "./scheduler.js";
 import { createCodesForBooking, deleteCodesForBooking, refreshCodesForBooking } from "./orchestrator.js";
@@ -14,7 +14,7 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
-// Shared-secret guard for the code read/delete routes that ue-codes calls.
+// Shared-secret guard for the code read/create/delete routes that ue-codes calls.
 // Closed with 503 until UE_SIFELY_KEY is set, so it's never accidentally open.
 function requireUeKey(req, res, next) {
   const expected = process.env.UE_SIFELY_KEY;
@@ -53,7 +53,7 @@ app.get("/locks", async (req, res) => {
   catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// --- Guarded routes for ue-codes (live code read + single-code delete) ---
+// --- Guarded routes for ue-codes (live code read / create / delete) ---
 
 // List the live keyboard passcodes on a lock.
 app.get("/lock/:lockId/codes", requireUeKey, async (req, res) => {
@@ -65,6 +65,17 @@ app.get("/lock/:lockId/codes", requireUeKey, async (req, res) => {
       pageSize: Number(req.query.pageSize) || 100,
     });
     res.json({ success: true, ...data });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// Create one keyboard passcode (custom digits or auto + name + validity window).
+app.post("/lock/code/create", requireUeKey, async (req, res) => {
+  try {
+    const { lockId, code, name, startDate, endDate } = req.body || {};
+    if (!lockId || !startDate || !endDate) return res.status(400).json({ error: "lockId, startDate and endDate are required" });
+    const token = await getToken();
+    const result = await addLockCode(token, { lockId: Number(lockId), code, name, startDate, endDate });
+    res.json({ success: true, ...result });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
