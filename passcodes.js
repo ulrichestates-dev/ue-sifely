@@ -41,15 +41,26 @@ export async function generatePasscode(token, { lockId, hasGateway, guestLabel, 
   }
 }
 
-export async function deletePasscode(token, { lockId, pwdId }) {
-  const params = new URLSearchParams({ lockId: String(lockId), keyboardPwdId: String(pwdId) });
-  const res = await fetch(`${BASE_URL}/v3/keyboardPwd/delete`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/x-www-form-urlencoded" },
-    body: params,
-  });
-  const data = await res.json();
-  if (data.code !== 200) throw new Error(`Delete passcode failed: ${JSON.stringify(data)}`);
+export async function deletePasscode(token, { lockId, pwdId, deleteType }) {
+  // deleteType is required by Sifely. Prefer 2 (via gateway); gatewayless locks
+  // answer -2012, so fall back to 1 (non-gateway/cloud delete).
+  const attempt = async (dt) => {
+    const params = new URLSearchParams({
+      lockId: String(lockId), keyboardPwdId: String(pwdId), deleteType: String(dt),
+    });
+    const res = await fetch(`${BASE_URL}/v3/keyboardPwd/delete`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/x-www-form-urlencoded" },
+      body: params,
+    });
+    return res.json();
+  };
+
+  let data = await attempt(deleteType || 2);
+  if (!deleteType && data && data.code === -2012) data = await attempt(1);
+  // Success is either TTLock-style (errcode 0) or Sifely-style (code 200).
+  const okResp = data && (data.errcode === 0 || data.code === 200);
+  if (!okResp) throw new Error(`Delete passcode failed: ${JSON.stringify(data)}`);
   return true;
 }
 
