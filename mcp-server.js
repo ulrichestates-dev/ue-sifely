@@ -45,7 +45,7 @@ const TOOLS = [
 
   // direct per-lock — write
   { name: "sifely_add_lock_code", description: "Add a keyboard passcode directly to a lock (no reservation). Provide code or one is generated. Dates optional (ISO or ms).", inputSchema: { type: "object", properties: { lockId: { type: "number" }, code: { type: "string" }, name: { type: "string" }, startDate: { type: "string" }, endDate: { type: "string" } }, required: ["lockId"] } },
-  { name: "sifely_delete_lock_code", description: "Delete a single passcode from a lock by keyboardPwdId (get the id from sifely_list_lock_codes).", inputSchema: { type: "object", properties: { lockId: { type: "number" }, keyboardPwdId: { type: "number" } }, required: ["lockId", "keyboardPwdId"] } },
+  { name: "sifely_delete_lock_code", description: "Delete a single passcode from a lock by keyboardPwdId (get the id from sifely_list_lock_codes).", inputSchema: { type: "object", properties: { lockId: { type: "number" }, keyboardPwdId: { type: "number" }, deleteType: { type: "number", description: "Optional. 2 = via gateway, 1 = non-gateway/cloud. Omit to auto-detect (tries 2, falls back to 1 for offline locks)." } }, required: ["lockId", "keyboardPwdId"] } },
   { name: "sifely_change_lock_code", description: "Change an existing passcode on a lock (new digits and/or new validity window).", inputSchema: { type: "object", properties: { lockId: { type: "number" }, keyboardPwdId: { type: "number" }, newCode: { type: "string" }, startDate: { type: "string" }, endDate: { type: "string" } }, required: ["lockId", "keyboardPwdId"] } },
   { name: "sifely_remote_unlock", description: "Remotely unlock a lock (gateway locks only).", inputSchema: lockIdOnly },
   { name: "sifely_remote_lock", description: "Remotely lock a lock (gateway locks only).", inputSchema: lockIdOnly },
@@ -55,7 +55,7 @@ const ok = (obj) => ({ content: [{ type: "text", text: JSON.stringify(obj, null,
 const fail = (msg) => ({ content: [{ type: "text", text: `Error: ${msg}` }], isError: true });
 
 export function createMcpServer() {
-  const server = new Server({ name: "ue-sifely", version: "2.1.0" }, { capabilities: { tools: {} } });
+  const server = new Server({ name: "ue-sifely", version: "2.1.1" }, { capabilities: { tools: {} } });
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
 
@@ -64,7 +64,7 @@ export function createMcpServer() {
     try {
       switch (name) {
         case "sifely_health":
-          return ok({ status: "ok", service: "ue-sifely", version: "2.1.0" });
+          return ok({ status: "ok", service: "ue-sifely", version: "2.1.1" });
         case "sifely_list_locks": {
           const token = await getToken();
           const locks = await getAllLocks(token);

@@ -97,11 +97,23 @@ export async function addLockCode(token, { lockId, code, name, startDate, endDat
   return { requestedCode: keyboardPwd, response: data };
 }
 
-export async function deleteLockCode(token, { lockId, keyboardPwdId }) {
-  return post(token, "/v3/keyboardPwd/delete", {
+export async function deleteLockCode(token, { lockId, keyboardPwdId, deleteType }) {
+  // Sifely requires deleteType on /v3/keyboardPwd/delete (its absence 500s with
+  // "Required request parameter 'deleteType' ... is not present").
+  //   deleteType 2 = via gateway (also clears the code from the physical lock)
+  //   deleteType 1 = non-gateway / cloud delete (only option for offline locks)
+  const attempt = (dt) => post(token, "/v3/keyboardPwd/delete", {
     lockId: String(lockId),
     keyboardPwdId: String(keyboardPwdId),
+    deleteType: String(dt),
   }, { form: true });
+
+  if (deleteType) return attempt(deleteType);           // explicit override wins
+  const viaGateway = await attempt(2);                  // prefer gateway sync
+  if (viaGateway && viaGateway.code === -2012) {        // "not connected to any Gateway"
+    return attempt(1);                                  // fall back to cloud delete
+  }
+  return viaGateway;
 }
 
 export async function changeLockCode(token, { lockId, keyboardPwdId, newCode, startDate, endDate }) {
