@@ -55,6 +55,12 @@ app.get("/locks", async (req, res) => {
 
 // --- Guarded routes for ue-codes (live code read / create / delete) ---
 
+// Key handshake check: lets callers verify their UE_SIFELY_KEY matches
+// without touching the Sifely cloud.
+app.get("/auth-check", requireUeKey, (req, res) => {
+  res.json({ ok: true });
+});
+
 // List the live keyboard passcodes on a lock.
 app.get("/lock/:lockId/codes", requireUeKey, async (req, res) => {
   try {
