@@ -42,12 +42,17 @@ export const PROPERTY_LOCK_MAP = [
   { hostawayId: 161069, address: "45 Hamilton Unit B",       lockId: 8439376,  role: "unit",     access: "owner", hasGateway: false },
   { hostawayId: 184041, address: "37 Smith St U4",           lockId: 9839654,  role: "unit",     access: "owner", hasGateway: false },
 
-  // Ekey properties — secondary admin access
-  { hostawayId: 478632, address: "394 Quincy St U1",         lockId: null,     role: "unit",     access: "ekey",  hasGateway: null  },
-  { hostawayId: 356386, address: "394 Quincy St U2",         lockId: null,     role: "unit",     access: "ekey",  hasGateway: null  },
-  { hostawayId: 324962, address: "53 Alvord Ave U2",         lockId: null,     role: "unit",     access: "ekey",  hasGateway: null  },
-  { hostawayId: 191036, address: "53 Alvord Ave U3",         lockId: null,     role: "unit",     access: "ekey",  hasGateway: null  },
-  { hostawayId: 321066, address: "43 Waumbeck St U2",        lockId: null,     role: "unit",     access: "ekey",  hasGateway: null  },
+  // Ekey properties — secondary admin access.
+  // automate:false — surfaced in /locks (Command Center / ue-codes show the lock
+  // and its on-lock codes) but EXCLUDED from 8AM code generation. These are
+  // offline ekey locks whose guest codes are managed manually via Hostaway
+  // custom fields / keypad; auto-generating would overwrite working codes.
+  { hostawayId: 478632, address: "394 Quincy St U1",         lockId: 27329140, role: "unit",     access: "ekey",  hasGateway: false, automate: false },
+  { hostawayId: 356386, address: "394 Quincy St U2",         lockId: null,     role: "unit",     access: "ekey",  hasGateway: null,  automate: false, lockSystem: "Electronic keypad (unit door); Sifely front entrance only" },
+  { hostawayId: 324962, address: "53 Alvord Ave U2",         lockId: 18373930, role: "unit",     access: "ekey",  hasGateway: false, automate: false },
+  { hostawayId: 191036, address: "53 Alvord Ave U3",         lockId: 9820068,  role: "unit",     access: "ekey",  hasGateway: false, automate: false },
+  { hostawayId: 321066, address: "43 Waumbeck St U2",        lockId: 27282912, role: "unit",     access: "ekey",  hasGateway: false, automate: false },
+  { hostawayId: null,   address: "394 Quincy Shared Entrance",lockId: 27822936, role: "entrance", access: "ekey",  hasGateway: false, automate: false },
 
   // Out of scope — non-Sifely or no automation possible
   { hostawayId: 468028, address: "9 Kenneth Rd",             lockId: null,     role: "unit",     access: "none",  hasGateway: false, lockSystem: "Yale"          },
@@ -135,6 +140,7 @@ function enrichLock(lock, accessType) {
     hostawayId:        mapEntry?.hostawayId  ?? null,
     propertyAddress:   mapEntry?.address     ?? "unmapped",
     role:              mapEntry?.role        ?? "unknown",  // entrance | unit | back
+    automate:          mapEntry?.automate    ?? true,        // false = manual-managed; skip 8AM generation
     status:            mapEntry ? "active" : "past",
     noKeyPwd:          lock.noKeyPwd ?? null,
     _raw:              lock,
