@@ -30,8 +30,8 @@ export async function createCodesForBooking(booking) {
   const guestLabel  = buildGuestLabel(guestLastName, platform, checkIn);
   const platformKey = normalizePlatform(platform);
 
-  const unitLocks     = PROPERTY_LOCK_MAP.filter(p => p.hostawayId === hostawayListingId && p.lockId !== null && p.access !== "none");
-  const entranceLocks = getEntranceLocks(hostawayListingId);
+  const unitLocks     = PROPERTY_LOCK_MAP.filter(p => p.hostawayId === hostawayListingId && p.lockId !== null && p.access !== "none" && p.automate !== false);
+  const entranceLocks = getEntranceLocks(hostawayListingId).filter(p => p.automate !== false);
   const allLocks      = dedupeByLockId([...unitLocks, ...entranceLocks]);
 
   if (allLocks.length === 0) {
