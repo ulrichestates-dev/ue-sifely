@@ -1,5 +1,5 @@
 import { getToken }                                      from "./auth.js";
-import { PROPERTY_LOCK_MAP }                             from "./locks.js";
+import { PROPERTY_LOCK_MAP, ENTRANCE_MAP }               from "./locks.js";
 import { generatePasscode, deletePasscode }              from "./passcodes.js";
 import { saveRecord, getRecord, markDeleted, markFailed } from "./records.js";
 import { sendAlert }                                     from "./alerts.js";
@@ -128,12 +128,7 @@ function normalizePlatform(platform) {
 }
 
 function getEntranceLocks(hostawayListingId) {
-  const entranceMap = {
-    471403: [27347090], 477004: [27347090], 479570: [27347090],
-    406539: [23474674], 412479: [23474674], 412478: [23474674],
-    478632: [27822936],
-  };
-  const ids = entranceMap[hostawayListingId] ?? [];
+  const ids = ENTRANCE_MAP[hostawayListingId] ?? [];
   return PROPERTY_LOCK_MAP.filter(p => ids.includes(p.lockId));
 }
 

@@ -60,6 +60,27 @@ export const PROPERTY_LOCK_MAP = [
   { hostawayId: 485986, address: "3543 Otterbein Ave",       lockId: null,     role: "unit",     access: "none",  hasGateway: false, lockSystem: "Lockbox + Eufy"},
 ];
 
+// Shared building entrances have hostawayId:null (they belong to no single
+// listing). This maps each unit listing → the shared entrance lock(s) it uses.
+// Single source of truth: the 8AM automation (orchestrator) AND the read path
+// (servesListings below) both consume it, so a unit's lookup shows its own door
+// PLUS the building's shared entrance.
+export const ENTRANCE_MAP = {
+  471403: [27347090], 477004: [27347090], 479570: [27347090], // 48 Quincy U1/U2/U3 → front door
+  406539: [23474674], 412479: [23474674], 412478: [23474674], // 246 Broadway U1/U2/Full → entrance
+  478632: [27822936], 356386: [27822936],                     // 394 Quincy U1/U2 → front entrance
+};
+
+// Reverse of ENTRANCE_MAP: entrance lockId → [unit hostawayIds it serves], so
+// enrichLock can tag each shared entrance with the listings it belongs under.
+const ENTRANCE_SERVES = (() => {
+  const rev = {};
+  for (const [listingId, lockIds] of Object.entries(ENTRANCE_MAP)) {
+    for (const id of lockIds) (rev[id] ??= []).push(Number(listingId));
+  }
+  return rev;
+})();
+
 // ── Owner locks ───────────────────────────────────────────────────────────────
 export async function getAllLocks(token) {
   const owned  = await fetchOwnedLocks(token);
@@ -140,6 +161,7 @@ function enrichLock(lock, accessType) {
     hostawayId:        mapEntry?.hostawayId  ?? null,
     propertyAddress:   mapEntry?.address     ?? "unmapped",
     role:              mapEntry?.role        ?? "unknown",  // entrance | unit | back
+    servesListings:    ENTRANCE_SERVES[lock.lockId] ?? null, // shared entrances: the unit listings they belong under
     automate:          mapEntry?.automate    ?? true,        // false = manual-managed; skip 8AM generation
     status:            mapEntry ? "active" : "past",
     noKeyPwd:          lock.noKeyPwd ?? null,
